@@ -56,6 +56,24 @@ const hide = el => el && (el.style.display = 'none');
 
 /* ── Helpers ── */
 function itemUrl(item){ return CONFIG.CDN_BASE + item.path; }
+
+// A file that was JUST uploaded can briefly 404/500 while jsDelivr's edge
+// catches up with the new commit, even though the Worker already purges
+// it server-side. Rather than leave a broken thumbnail until the user
+// manually refreshes, retry a few times with backoff and a cache-busting
+// query param before giving up.
+function setImgWithRetry(img, url, tries=4, delayMs=1000){
+  let attempt = 0;
+  const load = ()=>{
+    img.onerror = ()=>{
+      attempt++;
+      if(attempt > tries) return; // give up quietly — normal broken-image fallback
+      setTimeout(()=>{ img.src = url + (url.includes('?') ? '&' : '?') + 'r=' + attempt; }, delayMs * attempt);
+    };
+    img.src = url;
+  };
+  load();
+}
 function basename(p){ const parts=p.split('/'); return parts[parts.length-1]; }
 function dirname(p){ const parts=p.split('/'); parts.pop(); return parts.join('/'); }
 function joinRel(...segs){ return segs.map(s=>String(s||'').replace(/^\/+|\/+$/g,'')).filter(Boolean).join('/'); }
@@ -141,7 +159,7 @@ setTimeout(hidePreloader, 6000);
 onAuthStateChanged(auth, user=>{
   if(user){
     hide($('authView')); show($('appView')); $('appView').style.display='flex';
-    $('profileEmail').textContent = user.email || 'Signed in';
+    $('profileEmail').textContent = (user.email === 'aditiravisrivastava@gmail.com') ? 'Ms. Aditi Empress' : (user.email || 'Signed in');
     boot();
   }else{
     show($('authView')); $('authView').style.display='flex';
@@ -211,7 +229,8 @@ function buildTile(item){
   const kind = kindOf(item.path);
   if(kind === 'image'){
     const img = document.createElement('img');
-    img.src = itemUrl(item); img.loading = 'lazy'; img.alt = basename(item.path);
+    img.loading = 'lazy'; img.alt = basename(item.path);
+    setImgWithRetry(img, itemUrl(item));
     tile.appendChild(img);
   } else if(kind === 'video'){
     const wrap = document.createElement('div'); wrap.className='tile-file';
@@ -392,7 +411,9 @@ function buildHcard(entry){
     thumb.classList.add('folder');
     thumb.innerHTML = `<i class="bi bi-folder2"></i>`;
   } else if(isImage(item.path)){
-    thumb.innerHTML = `<img src="${itemUrl(item)}" loading="lazy" alt="">`;
+    const img = document.createElement('img'); img.loading='lazy'; img.alt='';
+    setImgWithRetry(img, itemUrl(item));
+    thumb.appendChild(img);
   } else if(isVideo(item.path)){
     thumb.innerHTML = `<i class="bi bi-play-circle-fill hcard-kind"></i>`;
   } else {
@@ -500,7 +521,7 @@ function renderAlbums(){
     if(items.length===0){
       cover.innerHTML = `<div class="album-cover-empty"><i class="bi bi-folder2"></i></div>`;
     } else {
-      for(const it of items){ const img=document.createElement('img'); img.src=itemUrl(it); img.loading='lazy'; cover.appendChild(img); }
+      for(const it of items){ const img=document.createElement('img'); img.loading='lazy'; setImgWithRetry(img, itemUrl(it)); cover.appendChild(img); }
     }
     const meta = document.createElement('div'); meta.className='album-meta';
     const count = filesIn(folder.path).length;
@@ -564,7 +585,7 @@ function showViewerAt(idx){
   favIcon.className = 'bi ' + (isFav(path) ? 'bi-heart-fill' : 'bi-heart');
   if(isImage(path)){
     show($('viewerImg')); hide($('viewerFileCard'));
-    $('viewerImg').src = itemUrl(item);
+    setImgWithRetry($('viewerImg'), itemUrl(item));
   } else {
     hide($('viewerImg')); show($('viewerFileCard'));
     $('viewerFileCard').style.display='flex';
@@ -611,7 +632,7 @@ function openDetailFor(path){
   $('detailFolder').textContent = dirname(item.path) ? '/'+dirname(item.path) : '/ (Home)';
   $('detailType').textContent = extLabel(item.path) + ' · ' + kindOf(item.path);
   $('detailUrl').textContent = itemUrl(item);
-  if(isImage(item.path)){ $('detailThumb').src = itemUrl(item); $('detailThumb').style.display=''; }
+  if(isImage(item.path)){ setImgWithRetry($('detailThumb'), itemUrl(item)); $('detailThumb').style.display=''; }
   else { $('detailThumb').style.display='none'; }
   $('detailOverlay').classList.add('open');
 }
