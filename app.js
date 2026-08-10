@@ -30,7 +30,7 @@
  *    favorite flag in the backend schema.
  */
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js';
 import { getAnalytics, isSupported as analyticsSupported } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-analytics.js';
 
 const FB = {apiKey:"AIzaSyCX2t3rdm_H-W3oemVldyLy6RDK2q9qqXE",authDomain:"aditiverse-gallary.firebaseapp.com",projectId:"aditiverse-gallary",storageBucket:"aditiverse-gallary.firebasestorage.app",messagingSenderId:"634381829802",appId:"1:634381829802:web:96494e89440e65646072d3",measurementId:"G-66LD4MR0PF"};
@@ -121,23 +121,14 @@ function recordUpload(path){ pushRecent(RECENT_UPLOADS_KEY, path, 'file'); }
 function recordAccess(path, type){ pushRecent(RECENT_ACCESS_KEY, path, type); }
 
 /* ══════════════════════ AUTH ══════════════════════ */
-$('loginForm').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  $('authErr').classList.remove('show');
-  const email = $('authEmail').value.trim();
-  const pass  = $('authPass').value;
-  $('authBtn').disabled = true;
-  hide($('authBtnLabel')); show($('authSpinner'));
-  try{
-    await signInWithEmailAndPassword(auth, email, pass);
-  }catch(ex){
-    $('authErrMsg').textContent = 'Invalid email or password.';
-    $('authErr').classList.add('show');
-    $('authBtn').disabled = false;
-    show($('authBtnLabel')); hide($('authSpinner'));
-  }
+// Login itself now lives on its own page — see auth.html / auth.js. This
+// page only needs to know: is someone signed in? If not, send them there.
+const AUTH_PAGE = 'auth.html';
+
+$('signOutBtn').addEventListener('click', ()=>{
+  toast('tit jnmn', 'ok');
+  setTimeout(()=> signOut(auth), 700);
 });
-$('signOutBtn').addEventListener('click', ()=> signOut(auth));
 
 let preloaderHidden = false;
 const _preloadStart = Date.now();
@@ -158,15 +149,13 @@ setTimeout(hidePreloader, 6000);
 
 onAuthStateChanged(auth, user=>{
   if(user){
-    hide($('authView')); show($('appView')); $('appView').style.display='flex';
+    show($('appView')); $('appView').style.display='flex';
     $('profileEmail').textContent = (user.email === 'aditiravisrivastava@gmail.com') ? 'Ms. Aditi Empress' : (user.email || 'Signed in');
     boot();
+    hidePreloader();
   }else{
-    show($('authView')); $('authView').style.display='flex';
-    hide($('appView'));
-    $('authBtn').disabled=false; show($('authBtnLabel')); hide($('authSpinner'));
+    window.location.replace(AUTH_PAGE);
   }
-  hidePreloader();
 });
 
 /* ══════════════════════ STATE ══════════════════════ */
@@ -325,25 +314,24 @@ function renderActiveView(){
   else if(v==='search') renderSearch();
   else if(v==='favorites') renderFavorites();
   else if(v==='albums') renderAlbums();
+  else if(v==='me') renderStorageSummary();
+}
+function goToView(name){
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  const navBtn = document.querySelector(`.nav-btn[data-view="${name}"]`);
+  if(navBtn) navBtn.classList.add('active');
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  $('view-'+name).classList.add('active');
+  if(selectMode) exitSelectMode();
+  renderCrumb();
+  renderActiveView();
+  window.scrollTo(0,0);
 }
 document.querySelectorAll('.nav-btn').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-    $('view-'+btn.dataset.view).classList.add('active');
-    if(selectMode) exitSelectMode();
-    renderCrumb();
-    renderActiveView();
-    window.scrollTo(0,0);
-  });
+  btn.addEventListener('click', ()=> goToView(btn.dataset.view));
 });
 $('topSearchBtn').addEventListener('click', ()=>{
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active', 'search'));
-  document.querySelector('.nav-btn[data-view="search"]').classList.add('active');
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  $('view-search').classList.add('active');
-  renderCrumb();
+  goToView('search');
   $('searchInput').focus();
 });
 
@@ -366,9 +354,9 @@ function renderCrumb(){
 }
 
 /* ══════════════════════ HOME ══════════════════════ */
-document.querySelectorAll('#filterChips .chip').forEach(chip=>{
+document.querySelectorAll('#filterChips .chip[data-filter]').forEach(chip=>{
   chip.addEventListener('click', ()=>{
-    document.querySelectorAll('#filterChips .chip').forEach(c=>c.classList.remove('active'));
+    document.querySelectorAll('#filterChips .chip[data-filter]').forEach(c=>c.classList.remove('active'));
     chip.classList.add('active');
     homeFilter = chip.dataset.filter;
     renderHome();
@@ -377,26 +365,81 @@ document.querySelectorAll('#filterChips .chip').forEach(chip=>{
 function renderHome(){
   if(!allItems.length && !$('homeError').style.display) { /* still loading or errored */ }
   const grid = $('homeGrid'); grid.innerHTML='';
-  let files = filesIn(currentFolder);
-  if(homeFilter!=='all') files = files.filter(f=>kindOf(f.path)===homeFilter);
+
+  // "All" browses folder-by-folder (scoped to currentFolder, folders shown
+  // as tiles). Photos/Videos act as a global filter across the whole
+  // gallery — like Search's type filter — since those files are often
+  // organized into subfolders and a folder-scoped filter would just look
+  // broken/empty from Home's root. "Albums" is its own thing: it lists
+  // every folder in the gallery, no files at all — a quick way to jump
+  // into an album without leaving Home for the Albums tab.
+  const isMediaTypeFilter = homeFilter === 'image' || homeFilter === 'video';
+  const isFolderFilter = homeFilter === 'folder';
+  let files = isMediaTypeFilter ? allFiles().filter(f=>kindOf(f.path)===homeFilter)
+            : isFolderFilter ? []
+            : filesIn(currentFolder);
   files = [...files].sort((a,b)=>basename(a.path).localeCompare(basename(b.path)));
   currentGridSource = files.map(f=>f.path);
 
+  const folders = isFolderFilter ? [...allFolders()].sort((a,b)=>basename(a.path).localeCompare(basename(b.path)))
+                 : homeFilter === 'all' ? [...foldersIn(currentFolder)].sort((a,b)=>basename(a.path).localeCompare(basename(b.path)))
+                 : [];
+
   // "Recent uploads" / "Recently accessed" only belong on the true Home
   // landing view (root, no active filter) — like Drive, they disappear
-  // once you're browsing inside an album.
+  // once you're browsing inside an album or a filter is active.
   const isHomeLanding = (currentFolder === '' && homeFilter === 'all');
   if(isHomeLanding){ renderRecents(); } else { hide($('recentUploadsSection')); hide($('recentAccessSection')); }
-  $('allFilesLabel').textContent = currentFolder ? basename(currentFolder) : 'All photos';
+  const filterLabel = {all:'All photos', image:'Photos', video:'Videos', folder:'Albums'}[homeFilter] || 'All photos';
+  $('allFilesLabel').textContent = (currentFolder && homeFilter==='all') ? basename(currentFolder) : filterLabel;
 
   if(!allItems.length){ return; } // loading/error states own the screen
-  if(files.length===0 && foldersIn(currentFolder).length===0){
+  if(files.length===0 && folders.length===0){
+    const empty = {
+      all:    {icon:'bi-images',       title:'No photos here yet', sub:'Tap the + button to add your first memory.'},
+      image:  {icon:'bi-images',       title:'No photos here yet', sub:'Tap the + button to add your first photo.'},
+      video:  {icon:'bi-camera-reels', title:'No videos here yet', sub:'Tap the + button to add your first video.'},
+      folder: {icon:'bi-folder2-open', title:'No albums yet',      sub:'Tap the folder icon above to create your first album.'},
+    }[homeFilter] || {icon:'bi-images', title:'No photos here yet', sub:'Tap the + button to add your first memory.'};
+    $('homeEmptyIcon').className = 'bi ' + empty.icon + ' state-icon';
+    $('homeEmptyTitle').textContent = empty.title;
+    $('homeEmptySub').textContent = empty.sub;
     show($('homeEmpty')); hide($('homeGrid'));
   } else {
     hide($('homeEmpty')); show($('homeGrid'));
-    for(const f of files) grid.appendChild(buildTile(f));
+    for(const fo of folders){
+      try{ grid.appendChild(buildFolderTile(fo)); }
+      catch(e){ console.error('buildFolderTile failed for', fo.path, e); }
+    }
+    for(const f of files){
+      try{ grid.appendChild(buildTile(f)); }
+      catch(e){ console.error('buildTile failed for', f.path, e); }
+    }
   }
   renderCrumb();
+}
+function buildFolderTile(folder){
+  const tile = document.createElement('div');
+  tile.className = 'tile tile-folder-wrap';
+  tile.dataset.path = folder.path;
+  const inner = document.createElement('div');
+  inner.className = 'tile-folder';
+  const count = filesIn(folder.path).length;
+  inner.innerHTML = `<i class="bi bi-folder-fill"></i><span class="tile-folder-name">${basename(folder.path)}</span><span class="tile-folder-count">${count} item${count===1?'':'s'}</span>`;
+  tile.appendChild(inner);
+  tile.addEventListener('click', ()=>{
+    currentFolder = folder.path;
+    recordAccess(folder.path, 'folder');
+    // Tapping into an album from the "Albums" filter should land you on
+    // "All" for that folder (files + any subfolders), not keep listing
+    // folders globally.
+    if(homeFilter === 'folder'){
+      homeFilter = 'all';
+      document.querySelectorAll('#filterChips .chip[data-filter]').forEach(c=>c.classList.toggle('active', c.dataset.filter==='all'));
+    }
+    renderHome();
+  });
+  return tile;
 }
 
 /* ══════════════════════ RECENTS (Home) ══════════════════════ */
@@ -506,7 +549,12 @@ function renderSearch(){
   $('searchCount').textContent = `${files.length} result${files.length===1?'':'s'}`;
   const grid = $('searchGrid'); grid.innerHTML='';
   currentGridSource = files.map(f=>f.path);
-  for(const f of files) grid.appendChild(buildTile(f));
+  if(files.length===0){
+    show($('searchEmpty')); hide($('searchGrid'));
+  } else {
+    hide($('searchEmpty')); show($('searchGrid'));
+    for(const f of files) grid.appendChild(buildTile(f));
+  }
 }
 
 /* ══════════════════════ ALBUMS ══════════════════════ */
@@ -530,11 +578,7 @@ function renderAlbums(){
     card.addEventListener('click', ()=>{
       currentFolder = folder.path;
       recordAccess(folder.path, 'folder');
-      document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-      document.querySelector('.nav-btn[data-view="home"]').classList.add('active');
-      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-      $('view-home').classList.add('active');
-      renderHome();
+      goToView('home');
     });
     grid.appendChild(card);
   }
@@ -800,9 +844,10 @@ $('pickerConfirmBtn').addEventListener('click', async ()=>{
 });
 
 /* ══════════════════════ RENAME / NEW ALBUM PROMPT ══════════════════════ */
-function openPrompt({title, sub, value='', placeholder='', confirmLabel='Save', onConfirm}){
+function openPrompt({title, sub, value='', placeholder='', confirmLabel='Save', inputType='text', onConfirm}){
   $('promptTitle').textContent = title;
   $('promptSub').textContent = sub || '';
+  $('promptInput').type = inputType;
   $('promptInput').value = value;
   $('promptInput').placeholder = placeholder;
   $('promptConfirmLabel').textContent = confirmLabel;
@@ -810,7 +855,7 @@ function openPrompt({title, sub, value='', placeholder='', confirmLabel='Save', 
   setTimeout(()=>{ $('promptInput').focus(); $('promptInput').select(); }, 60);
   $('promptModal')._onConfirm = onConfirm;
 }
-function closePrompt(){ $('promptModal').classList.remove('open'); $('promptConfirmBtn').classList.remove('loading'); $('promptConfirmBtn').disabled=false; }
+function closePrompt(){ $('promptModal').classList.remove('open'); $('promptConfirmBtn').classList.remove('loading'); $('promptConfirmBtn').disabled=false; $('promptInput').type='text'; }
 $('promptCancelBtn').addEventListener('click', closePrompt);
 $('promptModal').addEventListener('click', e=>{ if(e.target===$('promptModal')) closePrompt(); });
 $('promptInput').addEventListener('keydown', e=>{ if(e.key==='Enter') $('promptConfirmBtn').click(); });
@@ -818,9 +863,17 @@ $('promptConfirmBtn').addEventListener('click', async ()=>{
   const val = $('promptInput').value.trim();
   if(!val) return;
   const btn = $('promptConfirmBtn'); btn.classList.add('loading'); btn.disabled=true;
+  const handlerAtStart = $('promptModal')._onConfirm;
   try{
-    await $('promptModal')._onConfirm(val);
-    closePrompt();
+    await handlerAtStart(val);
+    // If onConfirm chained a new prompt (e.g. a two-step password change),
+    // _onConfirm now points at the new step's handler — leave that one
+    // open instead of closing what it just opened.
+    if($('promptModal')._onConfirm === handlerAtStart){
+      closePrompt();
+    } else {
+      btn.classList.remove('loading'); btn.disabled=false;
+    }
   }catch(e){
     toast('Failed: '+e.message,'err');
     btn.classList.remove('loading'); btn.disabled=false;
@@ -834,6 +887,7 @@ function renderStorageSummary(){
   const videos = files.filter(f=>isVideo(f.path)).reduce((s,f)=>s+(f.size||0),0);
   const others = files.filter(f=>!isImage(f.path)&&!isVideo(f.path)).reduce((s,f)=>s+(f.size||0),0);
   const total = photos+videos+others;
+  const photoCount = files.filter(f=>isImage(f.path)).length;
 
   $('meStorageSub').textContent = `${fmtBytes(total)} used · ${files.length} files`;
   $('storageBig').textContent = fmtBytes(total);
@@ -854,6 +908,35 @@ function renderStorageSummary(){
   ringVideos.style.strokeDashoffset = -CIRC*pPhotos;
   ringOthers.style.strokeDasharray = `${CIRC*pOthers} ${CIRC}`;
   ringOthers.style.strokeDashoffset = -CIRC*(pPhotos+pVideos);
+
+  // Profile tab: stat tiles + the compact inline storage card mirror the
+  // same real numbers, just presented smaller.
+  $('statAlbums').textContent = allFolders().length;
+  $('statFavorites').textContent = favs.size;
+  $('statPhotos').textContent = photoCount;
+
+  const MINI_CIRC = 2*Math.PI*34;
+  const miniPhotos = $('miniRingPhotos'), miniVideos = $('miniRingVideos'), miniOthers = $('miniRingOthers');
+  if(miniPhotos){
+    miniPhotos.style.strokeDasharray = `${MINI_CIRC*pPhotos} ${MINI_CIRC}`;
+    miniPhotos.style.strokeDashoffset = 0;
+    miniVideos.style.strokeDasharray = `${MINI_CIRC*pVideos} ${MINI_CIRC}`;
+    miniVideos.style.strokeDashoffset = -MINI_CIRC*pPhotos;
+    miniOthers.style.strokeDasharray = `${MINI_CIRC*pOthers} ${MINI_CIRC}`;
+    miniOthers.style.strokeDashoffset = -MINI_CIRC*(pPhotos+pVideos);
+  }
+  if($('legMiniPhotos')){
+    $('legMiniPhotos').textContent = fmtBytes(photos);
+    $('legMiniVideos').textContent = fmtBytes(videos);
+    $('legMiniOthers').textContent = fmtBytes(others);
+  }
+  if($('meStorageBar')){
+    // Bar shows the same Photos/Videos/Others split as the ring, stacked
+    // left to right — not a percentage of a fixed quota, since there
+    // isn't a real fixed quota to measure against.
+    $('meStorageBar').style.background =
+      `linear-gradient(to right, var(--pink-deep) 0% ${pPhotos*100}%, var(--yellow-deep) ${pPhotos*100}% ${(pPhotos+pVideos)*100}%, var(--green-deep) ${(pPhotos+pVideos)*100}% 100%)`;
+  }
 }
 $('meStorageBtn').addEventListener('click', ()=> $('storageOverlay').classList.add('open'));
 $('storageCloseBtn').addEventListener('click', ()=> $('storageOverlay').classList.remove('open'));
@@ -905,6 +988,7 @@ function uploadOne(file){
   xhr.onload = ()=>{
     if(xhr.status>=200 && xhr.status<300){
       fill.style.width='100%'; status.textContent='Uploaded'; status.classList.add('ok');
+      toast('upload ho gya sugnnuu', 'ok');
       try{
         const data = JSON.parse(xhr.responseText);
         if(data && data.path) recordUpload(data.path);
@@ -918,13 +1002,55 @@ function uploadOne(file){
   xhr.send(form);
 }
 
-/* ══════════════════════ MENU BUTTON (quick nav) ══════════════════════ */
-$('menuBtn').addEventListener('click', ()=>{
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelector('.nav-btn[data-view="me"]').classList.add('active');
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  $('view-me').classList.add('active');
+/* ══════════════════════ PROFILE: quick actions, theme, change password ══════════════════════ */
+$('qaUpload').addEventListener('click', ()=>{ $('uploadDestSelect').value = currentFolder || ''; $('uploadOverlay').classList.add('open'); });
+$('qaSearch').addEventListener('click', ()=>{ goToView('search'); $('searchInput').focus(); });
+$('qaAlbums').addEventListener('click', ()=> goToView('albums'));
+$('qaFavorites').addEventListener('click', ()=> goToView('favorites'));
+
+// ── Theme (real, persisted — light/dark, same pastel accents either way) ──
+const THEME_KEY = 'aditiverse_theme';
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
+  $('themePill').textContent = theme === 'dark' ? 'Dark' : 'Light';
+  try{ localStorage.setItem(THEME_KEY, theme); }catch{}
+}
+applyTheme((()=>{ try{ return localStorage.getItem(THEME_KEY) || 'light'; }catch{ return 'light'; } })());
+$('rowTheme').addEventListener('click', ()=>{
+  const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
 });
+
+// ── Change password (real — reauthenticates with the current password,
+// then sets the new one via Firebase Auth) ──
+$('rowChangePassword').addEventListener('click', ()=>{
+  const user = auth.currentUser;
+  if(!user || !user.email){ toast('No signed-in account found', 'err'); return; }
+  openPrompt({
+    title:'Change password', sub:'Enter your current password to continue.',
+    placeholder:'Current password', confirmLabel:'Continue', inputType:'password',
+    onConfirm: async (currentPw)=>{
+      const cred = EmailAuthProvider.credential(user.email, currentPw);
+      try{
+        await reauthenticateWithCredential(user, cred);
+      }catch(e){
+        throw new Error('Current password is incorrect.');
+      }
+      openPrompt({
+        title:'New password', sub:'Choose a new password (at least 6 characters).',
+        placeholder:'New password', confirmLabel:'Update password', inputType:'password',
+        onConfirm: async (newPw)=>{
+          if(newPw.length < 6) throw new Error('Password must be at least 6 characters.');
+          await updatePassword(user, newPw);
+          toast('sugnnu yaad rkhna password', 'ok');
+        }
+      });
+    }
+  });
+});
+
+/* ══════════════════════ MENU BUTTON (quick nav) ══════════════════════ */
+$('menuBtn').addEventListener('click', ()=> goToView('me'));
 
 /* ══════════════════════ BOOT ══════════════════════ */
 function boot(){

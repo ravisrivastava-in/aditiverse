@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AditiVerse">
+<meta name="theme-color" content="#FFFDF9">
+<title>Sign in · AditiVerse</title>
+<link rel="icon" href="https://cdn.futeducation.com/uploads/assets/mis/logo.webp">
+<link rel="apple-touch-icon" href="https://cdn.futeducation.com/uploads/assets/mis/logo.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;500;600;700;800;900&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script>
+// Apply saved theme before paint so there's no light-mode flash.
+(function(){ try{ if(localStorage.getItem('aditiverse_theme')==='dark') document.documentElement.setAttribute('data-theme','dark'); }catch(e){} })();
+</script>
+</head>
+<body>
+
+<div id="authView" class="auth-screen">
+  <div class="auth-blob b1"></div>
+  <div class="auth-blob b2"></div>
+  <div class="auth-blob b3"></div>
+  <div class="auth-card">
+    <div class="auth-logo-wrap">
+      <img class="auth-logo" src="https://cdn.futeducation.com/uploads/assets/mis/logo.webp" alt="AditiVerse">
+    </div>
+    <p class="auth-sub">Your Photos. Your Storage. Your Universe.</p>
+
+    <!-- The actual form (email/password/submit + error box) is built and
+         injected here by auth.js, not hardcoded in this HTML. -->
+    <div id="authFormRoot"></div>
+  </div>
+  <div class="auth-foot">Powered by your own CDN · R2 Storage · Cloudflare</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="auth.js"></script>
+</body>
+</html>

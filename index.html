@@ -12,9 +12,13 @@
 <link rel="icon" href="https://cdn.futeducation.com/uploads/assets/mis/logo.webp">
 <link rel="apple-touch-icon" href="https://cdn.futeducation.com/uploads/assets/mis/logo.webp">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;500;600;700;800;900&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=ADLaM+Display&family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;500;600;700;800;900&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script>
+// Apply saved theme before paint so there's no light-mode flash.
+(function(){ try{ if(localStorage.getItem('aditiverse_theme')==='dark') document.documentElement.setAttribute('data-theme','dark'); }catch(e){} })();
+</script>
 </head>
 <body>
 
@@ -26,43 +30,12 @@
   <div class="preloader-ring">
     <img src="https://cdn.futeducation.com/uploads/assets/mis/logo.webp" alt="AditiVerse" class="preloader-logo">
   </div>
-  <div class="preloader-welcome">Welcome, <span>Aditi</span></div>
+  <div class="preloader-welcome">Aawaa <span>Bhugnuu</span></div>
   <div class="preloader-sub">Opening your universe…</div>
   <div class="preloader-dots"><span></span><span></span><span></span></div>
 </div>
 
-<!-- ══════════════════════ LOGIN VIEW ══════════════════════ -->
-<div id="authView" class="auth-screen">
-  <div class="auth-blob b1"></div>
-  <div class="auth-blob b2"></div>
-  <div class="auth-blob b3"></div>
-  <div class="auth-card">
-    <div class="auth-logo-wrap">
-      <img class="auth-logo" src="https://cdn.futeducation.com/uploads/assets/mis/logo.webp" alt="AditiVerse">
-    </div>
-    <p class="auth-sub">Your Photos. Your Storage. Your Universe.</p>
-
-    <div class="auth-err" id="authErr"><i class="bi bi-exclamation-circle"></i><span id="authErrMsg">Invalid credentials</span></div>
-
-    <form id="loginForm" class="auth-form" autocomplete="on" novalidate>
-      <div class="ig">
-        <label>Email</label>
-        <input type="email" class="inp" id="authEmail" name="email" placeholder="you@example.com" autocomplete="email" inputmode="email" required>
-      </div>
-      <div class="ig">
-        <label>Password</label>
-        <input type="password" class="inp" id="authPass" name="password" placeholder="••••••••" autocomplete="current-password" required>
-      </div>
-      <button type="submit" class="btn-verse btn-full" id="authBtn">
-        <span id="authBtnLabel"><i class="bi bi-stars"></i> Enter AditiVerse</span>
-        <span class="spinner" id="authSpinner" style="display:none"></span>
-      </button>
-    </form>
-  </div>
-  <div class="auth-foot">Powered by your own CDN · R2 Storage · Cloudflare</div>
-</div>
-
-<!-- ══════════════════════ APP SHELL ══════════════════════ -->
+<!-- Login now lives on its own page — see auth.html / auth.js. -->
 <div id="appView" class="app-shell" style="display:none">
 
   <!-- ── Top bar ── -->
@@ -99,7 +72,7 @@
         <button class="chip active" data-filter="all">All</button>
         <button class="chip" data-filter="image">Photos</button>
         <button class="chip" data-filter="video">Videos</button>
-        <button class="chip" data-filter="file">Files</button>
+        <button class="chip" data-filter="folder">Albums</button>
         <button class="chip chip-action icon-only" id="newFolderChip" aria-label="New folder" title="New folder">
           <svg width="15" height="15" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M2.5 5.5C2.5 4.67 3.17 4 4 4h4.4l1.6 2h8c.83 0 1.5.67 1.5 1.5v7c0 .83-.67 1.5-1.5 1.5H4c-.83 0-1.5-.67-1.5-1.5v-9Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
@@ -125,12 +98,12 @@
         <button class="btn-verse-outline" id="homeRetryBtn">Retry</button>
       </div>
       <div class="state-block" id="homeEmpty" style="display:none">
-        <i class="bi bi-images state-icon"></i>
-        <div class="state-title">No photos here yet</div>
-        <div class="state-sub">Tap the + button to add your first memory.</div>
+        <i class="bi bi-images state-icon" id="homeEmptyIcon"></i>
+        <div class="state-title" id="homeEmptyTitle">No photos here yet</div>
+        <div class="state-sub" id="homeEmptySub">Tap the + button to add your first memory.</div>
       </div>
 
-      <div class="grid-label" id="allFilesLabel">All photos</div>
+      <div class="grid-label"><i class="bi bi-grid-3x3-gap-fill"></i><span id="allFilesLabel">All photos</span></div>
       <div class="grid" id="homeGrid"></div>
     </section>
 
@@ -178,6 +151,10 @@
       </div>
 
       <div class="search-count" id="searchCount"></div>
+      <div class="state-block" id="searchEmpty" style="display:none">
+        <i class="bi bi-search-heart state-icon"></i>
+        <div class="state-title">nhi na hai sugnnuu</div>
+      </div>
       <div class="grid" id="searchGrid"></div>
     </section>
 
@@ -210,25 +187,85 @@
       <div class="profile-card">
         <div class="profile-avatar-ring">
           <img src="https://cdn.futeducation.com/uploads/assets/mis/logo.webp" alt="" class="profile-avatar">
+          <span class="profile-crown"><i class="bi bi-award-fill"></i></span>
         </div>
-        <div class="profile-email" id="profileEmail">Ms. Aditi Empress</div>
-        <div class="profile-tag">AditiVerse Empress</div>
+        <div class="profile-email-row">
+          <span class="profile-email" id="profileEmail">Ms. Aditi Empress</span>
+          <i class="bi bi-patch-check-fill profile-verified"></i>
+        </div>
+        <div class="profile-tag">You're the ultimate empress of my life jnmn</div>
+        <div class="profile-badges">
+          <span class="pbadge yellow">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M7 8.5c-2.2 0-4 1.57-4 3.5s1.8 3.5 4 3.5c1.6 0 3.05-.9 4-2.2.5-.68 1-1.55 1.3-2.2M17 8.5c2.2 0 4 1.57 4 3.5s-1.8 3.5-4 3.5c-1.6 0-3.05-.9-4-2.2-.5-.68-1-1.55-1.3-2.2M9 10.3c.6-1 2-2.8 3-2.8s2.4 1.8 3 2.8M9 13.7c.6 1 2 2.8 3 2.8s2.4-1.8 3-2.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Till Infinity</span>
+          </span>
+          <span class="pbadge pink"><i class="bi bi-heart-fill"></i>Made with Love</span>
+          <span class="pbadge green"><i class="bi bi-shield-check"></i>Lobhhhhh</span>
+        </div>
       </div>
 
       <div class="love-note">
-        <span class="love-quote-mark">"</span>
-        <p>Every sunrise feels a little softer because you're in it, Aditi. This whole little universe is just my way of keeping every smile, every silly selfie, and every quiet moment of ours safe in one place — because loving you is the easiest, happiest thing I've ever done.</p>
-        <span class="love-quote-mark end">"</span>
+        <div class="love-note-inner">
+          <span class="love-note-heart"><i class="bi bi-heart-fill"></i></span>
+          <p class="love-note-adlam"><span class="love-quote-mark">"</span>Ae jnmn hm tumse bohot jyda pyar krte hai hm tumko kbhi bhi kuch bhi cheej ka dikkat nhi hone denge or jnmn hm glti krte krte sudharte sudharte sikh jaenge jnmn sb…<span class="love-quote-mark end">"</span></p>
+        </div>
       </div>
 
-      <button class="me-row" id="meStorageBtn">
-        <i class="bi bi-pie-chart-fill me-ico"></i>
-        <div class="me-row-text">
-          <span class="me-row-title">Storage overview</span>
-          <span class="me-row-sub" id="meStorageSub">Calculating…</span>
+      <div class="stat-grid">
+        <div class="stat-tile"><i class="bi bi-images"></i><span class="stat-num" id="statAlbums">0</span><span class="stat-label">Albums</span></div>
+        <div class="stat-tile"><i class="bi bi-heart-fill"></i><span class="stat-num" id="statFavorites">0</span><span class="stat-label">Favorites</span></div>
+        <div class="stat-tile"><i class="bi bi-camera-fill"></i><span class="stat-num" id="statPhotos">0</span><span class="stat-label">Photos</span></div>
+      </div>
+
+      <button class="storage-card" id="meStorageBtn">
+        <div class="storage-card-ring-wrap">
+          <svg viewBox="0 0 80 80" class="storage-card-ring">
+            <circle cx="40" cy="40" r="34" class="ring-bg"/>
+            <circle cx="40" cy="40" r="34" class="ring-photos" id="miniRingPhotos"/>
+            <circle cx="40" cy="40" r="34" class="ring-videos" id="miniRingVideos"/>
+            <circle cx="40" cy="40" r="34" class="ring-others" id="miniRingOthers"/>
+          </svg>
+          <i class="bi bi-cloud-arrow-up-fill storage-card-icon"></i>
         </div>
-        <i class="bi bi-chevron-right"></i>
+        <div class="storage-card-body">
+          <div class="storage-card-head">
+            <span class="storage-card-title">Storage overview</span>
+            <i class="bi bi-chevron-right"></i>
+          </div>
+          <span class="storage-card-sub" id="meStorageSub">Calculating…</span>
+          <div class="storage-card-bar"><div class="storage-card-bar-fill" id="meStorageBar"></div></div>
+          <div class="storage-card-legend">
+            <span><i class="dot photos"></i>Photos <b id="legMiniPhotos">0 B</b></span>
+            <span><i class="dot videos"></i>Videos <b id="legMiniVideos">0 B</b></span>
+            <span><i class="dot others"></i>Files <b id="legMiniOthers">0 B</b></span>
+          </div>
+        </div>
       </button>
+
+      <div class="quick-actions">
+        <div class="qa-title">Quick actions</div>
+        <div class="qa-row">
+          <button class="qa-tile yellow" id="qaUpload"><i class="bi bi-cloud-arrow-up-fill"></i><span>Upload</span></button>
+          <button class="qa-tile pink" id="qaSearch"><i class="bi bi-search"></i><span>Search</span></button>
+          <button class="qa-tile green" id="qaAlbums"><i class="bi bi-images"></i><span>Albums</span></button>
+          <button class="qa-tile lav" id="qaFavorites"><i class="bi bi-heart-fill"></i><span>Favorites</span></button>
+        </div>
+      </div>
+
+      <div class="me-list">
+        <button class="me-row" id="rowChangePassword">
+          <i class="bi bi-key-fill me-ico"></i>
+          <div class="me-row-text"><span class="me-row-title">Change Password</span><span class="me-row-sub">Update your sign-in password</span></div>
+          <i class="bi bi-chevron-right"></i>
+        </button>
+        <button class="me-row" id="rowTheme">
+          <i class="bi bi-palette-fill me-ico"></i>
+          <div class="me-row-text"><span class="me-row-title">Theme</span><span class="me-row-sub">Light or dark, pastel either way</span></div>
+          <span class="theme-pill" id="themePill">Light</span>
+        </button>
+      </div>
 
       <button class="me-row danger" id="signOutBtn">
         <i class="bi bi-box-arrow-right me-ico"></i>
