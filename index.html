@@ -12,11 +12,24 @@
 <link rel="icon" href="https://cdn.futeducation.com/uploads/assets/mis/logo.webp">
 <link rel="apple-touch-icon" href="https://cdn.futeducation.com/uploads/assets/mis/logo.webp">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;500;600;700;800;900&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- ══════════════════════ PRELOADER ══════════════════════ -->
+<div id="preloader" class="preloader">
+  <div class="preloader-blob pb1"></div>
+  <div class="preloader-blob pb2"></div>
+  <div class="preloader-blob pb3"></div>
+  <div class="preloader-ring">
+    <img src="https://cdn.futeducation.com/uploads/assets/mis/logo.webp" alt="AditiVerse" class="preloader-logo">
+  </div>
+  <div class="preloader-welcome">Welcome, <span>Aditi</span></div>
+  <div class="preloader-sub">Opening your universe…</div>
+  <div class="preloader-dots"><span></span><span></span><span></span></div>
+</div>
 
 <!-- ══════════════════════ LOGIN VIEW ══════════════════════ -->
 <div id="authView" class="auth-screen">
@@ -76,11 +89,28 @@
 
     <!-- HOME -->
     <section class="view active" id="view-home">
-      <div class="chiprow" id="filterChips">
+
+      <div class="hsection" id="recentUploadsSection" style="display:none">
+        <div class="hsection-title"><i class="bi bi-cloud-arrow-up-fill"></i> Recent uploads</div>
+        <div class="hscroll" id="recentUploadsRow"></div>
+      </div>
+
+      <div class="chiprow center" id="filterChips">
         <button class="chip active" data-filter="all">All</button>
         <button class="chip" data-filter="image">Photos</button>
         <button class="chip" data-filter="video">Videos</button>
         <button class="chip" data-filter="file">Files</button>
+        <button class="chip chip-action icon-only" id="newFolderChip" aria-label="New folder" title="New folder">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2.5 5.5C2.5 4.67 3.17 4 4 4h4.4l1.6 2h8c.83 0 1.5.67 1.5 1.5v7c0 .83-.67 1.5-1.5 1.5H4c-.83 0-1.5-.67-1.5-1.5v-9Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+            <path d="M10 9.5v5M7.5 12h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="hsection" id="recentAccessSection" style="display:none">
+        <div class="hsection-title"><i class="bi bi-clock-history"></i> Recently accessed</div>
+        <div class="hscroll" id="recentAccessRow"></div>
       </div>
 
       <div class="state-block" id="homeLoading">
@@ -100,6 +130,7 @@
         <div class="state-sub">Tap the + button to add your first memory.</div>
       </div>
 
+      <div class="grid-label" id="allFilesLabel">All photos</div>
       <div class="grid" id="homeGrid"></div>
     </section>
 
@@ -143,6 +174,7 @@
             <option value="size-asc">Smallest first</option>
           </select>
         </div>
+        <button class="clear-filters-btn" id="clearFiltersBtn"><i class="bi bi-x-circle"></i> Clear filters</button>
       </div>
 
       <div class="search-count" id="searchCount"></div>
@@ -179,8 +211,14 @@
         <div class="profile-avatar-ring">
           <img src="https://cdn.futeducation.com/uploads/assets/mis/logo.webp" alt="" class="profile-avatar">
         </div>
-        <div class="profile-email" id="profileEmail">—</div>
-        <div class="profile-tag">AditiVerse member</div>
+        <div class="profile-email" id="profileEmail">Ms. Aditi Empress</div>
+        <div class="profile-tag">AditiVerse Empress</div>
+      </div>
+
+      <div class="love-note">
+        <span class="love-quote-mark">"</span>
+        <p>Every sunrise feels a little softer because you're in it, Aditi. This whole little universe is just my way of keeping every smile, every silly selfie, and every quiet moment of ours safe in one place — because loving you is the easiest, happiest thing I've ever done.</p>
+        <span class="love-quote-mark end">"</span>
       </div>
 
       <button class="me-row" id="meStorageBtn">
@@ -192,18 +230,12 @@
         <i class="bi bi-chevron-right"></i>
       </button>
 
-      <div class="me-row static">
-        <i class="bi bi-cloud-check-fill me-ico"></i>
-        <div class="me-row-text">
-          <span class="me-row-title">Built for Performance</span>
-          <span class="me-row-sub">R2 Storage · Cloudflare CDN · WebP/AVIF ready</span>
-        </div>
-      </div>
-
       <button class="me-row danger" id="signOutBtn">
         <i class="bi bi-box-arrow-right me-ico"></i>
         <div class="me-row-text"><span class="me-row-title">Sign out</span></div>
       </button>
+
+      <footer class="me-footer">Created With Love For <span>Aditi</span> By <span>Ravi</span></footer>
     </section>
 
   </main>
@@ -370,10 +402,10 @@
     <div class="sheet" id="shareSheet">
       <div class="sheet-handle"></div>
       <h3 class="sheet-title">Share</h3>
-      <p class="share-hint">Anyone with this link can view/download directly from your CDN.</p>
+      <p class="share-hint">Shares the original file itself — pick WhatsApp, Mail, or anything else from your device's share sheet.</p>
       <div class="share-links" id="shareLinks"></div>
-      <button class="btn-verse btn-full" id="shareCopyAllBtn"><i class="bi bi-copy"></i> Copy link<span id="shareCopyPlural"></span></button>
-      <button class="btn-verse-outline btn-full" id="shareNativeBtn"><i class="bi bi-share-fill"></i> Use device share sheet</button>
+      <button class="btn-verse btn-full" id="shareNativeBtn"><i class="bi bi-share-fill"></i> <span id="shareNativeLabel">Share original file</span></button>
+      <button class="btn-verse-outline btn-full" id="shareCopyAllBtn"><i class="bi bi-copy"></i> Copy link<span id="shareCopyPlural"></span> instead</button>
       <button class="btn-verse-outline btn-full" id="shareCloseBtn">Close</button>
     </div>
   </div>

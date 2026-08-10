@@ -41,6 +41,9 @@ const CONFIG = { CDN_BASE: 'https://api.aditiverse.in/' };
 const IMG_RE   = /\.(jpe?g|png|gif|webp|svg|avif|bmp|ico|tiff?)$/i;
 const VID_RE   = /\.(mp4|mov|webm|mkv|avi|m4v)$/i;
 const FAV_KEY  = 'aditiverse_favs';
+const RECENT_UPLOADS_KEY = 'aditiverse_recent_uploads';
+const RECENT_ACCESS_KEY  = 'aditiverse_recent_access';
+const RECENTS_MAX = 15;
 
 const app  = getApps().length ? getApps()[0] : initializeApp(FB);
 const auth = getAuth(app);
@@ -84,6 +87,21 @@ function toggleFav(path){
   saveFavs(favs);
 }
 
+/* Recent uploads / recently accessed — real local history (per browser).
+   The backend has no per-file timestamps, so these reflect what actually
+   happened in this browser rather than invented server-side dates:
+   uploads made through the app, and files/albums you've actually opened. */
+function loadRecentList(key){ try{ return JSON.parse(localStorage.getItem(key)||'[]'); }catch{ return []; } }
+function saveRecentList(key, list){ try{ localStorage.setItem(key, JSON.stringify(list)); }catch{} }
+function pushRecent(key, path, type){
+  let list = loadRecentList(key).filter(e=>e.path!==path);
+  list.unshift({path, type, ts: Date.now()});
+  if(list.length > RECENTS_MAX) list = list.slice(0, RECENTS_MAX);
+  saveRecentList(key, list);
+}
+function recordUpload(path){ pushRecent(RECENT_UPLOADS_KEY, path, 'file'); }
+function recordAccess(path, type){ pushRecent(RECENT_ACCESS_KEY, path, type); }
+
 /* ══════════════════════ AUTH ══════════════════════ */
 $('loginForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
@@ -103,6 +121,23 @@ $('loginForm').addEventListener('submit', async (e)=>{
 });
 $('signOutBtn').addEventListener('click', ()=> signOut(auth));
 
+let preloaderHidden = false;
+const _preloadStart = Date.now();
+const PRELOAD_MIN_MS = 900;
+function hidePreloader(){
+  if(preloaderHidden) return;
+  preloaderHidden = true;
+  const el = $('preloader');
+  if(!el) return;
+  const wait = Math.max(0, PRELOAD_MIN_MS - (Date.now() - _preloadStart));
+  setTimeout(()=>{
+    el.classList.add('fade-out');
+    setTimeout(()=>{ el.style.display='none'; }, 550);
+  }, wait);
+}
+// Safety net: never let the preloader get stuck if auth is unusually slow.
+setTimeout(hidePreloader, 6000);
+
 onAuthStateChanged(auth, user=>{
   if(user){
     hide($('authView')); show($('appView')); $('appView').style.display='flex';
@@ -113,6 +148,7 @@ onAuthStateChanged(auth, user=>{
     hide($('appView'));
     $('authBtn').disabled=false; show($('authBtnLabel')); hide($('authSpinner'));
   }
+  hidePreloader();
 });
 
 /* ══════════════════════ STATE ══════════════════════ */
@@ -327,6 +363,13 @@ function renderHome(){
   files = [...files].sort((a,b)=>basename(a.path).localeCompare(basename(b.path)));
   currentGridSource = files.map(f=>f.path);
 
+  // "Recent uploads" / "Recently accessed" only belong on the true Home
+  // landing view (root, no active filter) — like Drive, they disappear
+  // once you're browsing inside an album.
+  const isHomeLanding = (currentFolder === '' && homeFilter === 'all');
+  if(isHomeLanding){ renderRecents(); } else { hide($('recentUploadsSection')); hide($('recentAccessSection')); }
+  $('allFilesLabel').textContent = currentFolder ? basename(currentFolder) : 'All photos';
+
   if(!allItems.length){ return; } // loading/error states own the screen
   if(files.length===0 && foldersIn(currentFolder).length===0){
     show($('homeEmpty')); hide($('homeGrid'));
@@ -335,6 +378,55 @@ function renderHome(){
     for(const f of files) grid.appendChild(buildTile(f));
   }
   renderCrumb();
+}
+
+/* ══════════════════════ RECENTS (Home) ══════════════════════ */
+function buildHcard(entry){
+  // entry: {path, type, ts}. Resolves against live allItems so deleted/
+  // moved things quietly drop out instead of showing broken thumbnails.
+  const item = findItem(entry.path);
+  if(!item) return null;
+  const card = document.createElement('div'); card.className='hcard';
+  const thumb = document.createElement('div'); thumb.className='hcard-thumb';
+  if(item.type === 'folder'){
+    thumb.classList.add('folder');
+    thumb.innerHTML = `<i class="bi bi-folder2"></i>`;
+  } else if(isImage(item.path)){
+    thumb.innerHTML = `<img src="${itemUrl(item)}" loading="lazy" alt="">`;
+  } else if(isVideo(item.path)){
+    thumb.innerHTML = `<i class="bi bi-play-circle-fill hcard-kind"></i>`;
+  } else {
+    thumb.innerHTML = `<i class="bi bi-file-earmark-fill hcard-kind"></i>`;
+  }
+  const name = document.createElement('div'); name.className='hcard-name'; name.textContent = basename(item.path);
+  card.appendChild(thumb); card.appendChild(name);
+  card.addEventListener('click', ()=>{
+    if(item.type === 'folder'){
+      currentFolder = item.path;
+      recordAccess(item.path, 'folder');
+      renderHome();
+    } else {
+      const siblings = filesIn(dirname(item.path)).map(f=>f.path);
+      openViewerFor(item.path, siblings);
+    }
+  });
+  return card;
+}
+function renderRecents(){
+  const uploads = loadRecentList(RECENT_UPLOADS_KEY);
+  const access   = loadRecentList(RECENT_ACCESS_KEY);
+
+  const uRow = $('recentUploadsRow'); uRow.innerHTML='';
+  let uCount = 0;
+  for(const e of uploads){ const c = buildHcard(e); if(c){ uRow.appendChild(c); uCount++; } }
+  if(uCount){ show($('recentUploadsSection')); }
+  else hide($('recentUploadsSection'));
+
+  const aRow = $('recentAccessRow'); aRow.innerHTML='';
+  let aCount = 0;
+  for(const e of access){ const c = buildHcard(e); if(c){ aRow.appendChild(c); aCount++; } }
+  if(aCount){ show($('recentAccessSection')); }
+  else hide($('recentAccessSection'));
 }
 
 /* ══════════════════════ SEARCH ══════════════════════ */
@@ -354,6 +446,18 @@ document.querySelectorAll('[data-fsize]').forEach(c=>c.addEventListener('click',
 }));
 $('searchFolderSelect').addEventListener('change', e=>{ searchFilter.folder = e.target.value; renderSearch(); });
 $('sortSelect').addEventListener('change', e=>{ searchFilter.sort = e.target.value; renderSearch(); });
+$('clearFiltersBtn').addEventListener('click', ()=>{
+  searchQuery = '';
+  $('searchInput').value = '';
+  hide($('searchClearBtn'));
+  searchFilter = { type:'all', size:'all', folder:'__all', sort:'name-asc' };
+  document.querySelectorAll('[data-ftype]').forEach(c=>c.classList.toggle('active', c.dataset.ftype==='all'));
+  document.querySelectorAll('[data-fsize]').forEach(c=>c.classList.toggle('active', c.dataset.fsize==='all'));
+  $('searchFolderSelect').value = '__all';
+  $('sortSelect').value = 'name-asc';
+  renderSearch();
+  toast('Filters cleared','ok');
+});
 
 function renderSearch(){
   let files = allFiles();
@@ -404,6 +508,7 @@ function renderAlbums(){
     card.appendChild(cover); card.appendChild(meta);
     card.addEventListener('click', ()=>{
       currentFolder = folder.path;
+      recordAccess(folder.path, 'folder');
       document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
       document.querySelector('.nav-btn[data-view="home"]').classList.add('active');
       document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
@@ -413,17 +518,22 @@ function renderAlbums(){
     grid.appendChild(card);
   }
 }
-$('newAlbumBtn').addEventListener('click', ()=>openPrompt({
-  title:'New album', sub:'Name your new album.', placeholder:'Album name', confirmLabel:'Create',
-  onConfirm: async (name)=>{
-    const path = joinRel(currentFolder, name);
-    const res = await fetch(`${WORKER_URL}/folder/create`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})});
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    toast('Album created','ok');
-    await loadFiles();
-  }
-}));
+function openNewFolderPrompt(){
+  openPrompt({
+    title:'New folder', sub: currentFolder ? `Inside /${currentFolder}` : 'Name your new folder.',
+    placeholder:'Folder name', confirmLabel:'Create',
+    onConfirm: async (name)=>{
+      const path = joinRel(currentFolder, name);
+      const res = await fetch(`${WORKER_URL}/folder/create`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})});
+      const data = await res.json();
+      if(!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast('Folder created','ok');
+      await loadFiles();
+    }
+  });
+}
+$('newAlbumBtn').addEventListener('click', openNewFolderPrompt);
+$('newFolderChip').addEventListener('click', openNewFolderPrompt);
 
 /* ══════════════════════ FAVORITES ══════════════════════ */
 function renderFavorites(){
@@ -441,6 +551,8 @@ function openViewerFor(path, list){
   if(viewerIndex === -1) viewerIndex = 0;
   showViewerAt(viewerIndex);
   $('viewer').classList.add('open');
+  recordAccess(path, 'file');
+  if(activeViewName()==='home') renderRecents();
 }
 function showViewerAt(idx){
   const path = currentGridSource[idx];
@@ -533,24 +645,60 @@ function downloadItem(item){
 }
 
 /* ══════════════════════ SHARE ══════════════════════ */
+// Shares the actual file bytes when the platform supports it (Web Share
+// API Level 2, navigator.canShare({files})), so e.g. picking WhatsApp
+// attaches the real PNG/JPG/video instead of just a link. Falls back to
+// a link-only share, then to copy, on platforms that can't share files
+// (most desktop browsers).
 function openShare(items){
-  const links = items.filter(Boolean).map(itemUrl);
+  const cleanItems = items.filter(Boolean);
+  const links = cleanItems.map(itemUrl);
   const box = $('shareLinks'); box.innerHTML='';
   for(const l of links){ const row=document.createElement('div'); row.className='share-link-row'; row.textContent=l; box.appendChild(row); }
   $('shareCopyPlural').textContent = links.length>1 ? `s (${links.length})` : '';
+  $('shareNativeLabel').textContent = cleanItems.length>1 ? 'Share original files' : 'Share original file';
   $('shareOverlay').classList.add('open');
   $('shareOverlay')._links = links;
+  $('shareOverlay')._items = cleanItems;
 }
 $('shareCloseBtn').addEventListener('click', ()=> $('shareOverlay').classList.remove('open'));
 $('shareOverlay').addEventListener('click', e=>{ if(e.target===$('shareOverlay')) $('shareOverlay').classList.remove('open'); });
 $('shareCopyAllBtn').addEventListener('click', ()=> copyText(($('shareOverlay')._links||[]).join('\n')));
-$('shareNativeBtn').addEventListener('click', async ()=>{
-  const links = $('shareOverlay')._links || [];
-  if(navigator.share){
-    try{ await navigator.share({ title:'AditiVerse', text:'Shared from AditiVerse', url:links[0] }); }catch{}
-  } else {
-    copyText(links.join('\n'));
+
+async function fetchAsShareFiles(items){
+  const files = [];
+  for(const item of items){
+    try{
+      const res = await fetch(itemUrl(item));
+      if(!res.ok) continue;
+      const blob = await res.blob();
+      files.push(new File([blob], basename(item.path), {type: blob.type || 'application/octet-stream'}));
+    }catch{ /* skip files that fail to fetch, share whatever did */ }
   }
+  return files;
+}
+
+$('shareNativeBtn').addEventListener('click', async ()=>{
+  const items = $('shareOverlay')._items || [];
+  const links = $('shareOverlay')._links || [];
+  const btn = $('shareNativeBtn');
+  const origLabel = $('shareNativeLabel').textContent;
+
+  if(items.length && navigator.canShare){
+    btn.disabled = true; $('shareNativeLabel').textContent = 'Preparing file…';
+    const files = await fetchAsShareFiles(items);
+    btn.disabled = false; $('shareNativeLabel').textContent = origLabel;
+    if(files.length && navigator.canShare({files})){
+      try{ await navigator.share({files, title:'AditiVerse'}); return; }
+      catch(e){ if(e && e.name==='AbortError') return; /* user cancelled, not an error */ }
+    }
+  }
+  // Fall back to a link share, then to copy — still useful on platforms
+  // (mostly desktop) that can't share raw files.
+  if(navigator.share){
+    try{ await navigator.share({ title:'AditiVerse', text:'Shared from AditiVerse', url:links[0] }); return; }catch{}
+  }
+  copyText(links.join('\n'));
 });
 
 /* ══════════════════════ SELECTION TOOLBAR ══════════════════════ */
@@ -736,6 +884,10 @@ function uploadOne(file){
   xhr.onload = ()=>{
     if(xhr.status>=200 && xhr.status<300){
       fill.style.width='100%'; status.textContent='Uploaded'; status.classList.add('ok');
+      try{
+        const data = JSON.parse(xhr.responseText);
+        if(data && data.path) recordUpload(data.path);
+      }catch{}
       loadFiles();
     } else {
       status.textContent='Upload failed'; status.classList.add('err');
