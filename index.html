@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AditiVerse">
+<meta name="theme-color" content="#FFFDF9">
+<title>AditiVerse · Your Photos, Your Universe</title>
+<link rel="icon" href="https://cdn.futeducation.com/uploads/assets/mis/logo.webp">
+<link rel="apple-touch-icon" href="https://cdn.futeducation.com/uploads/assets/mis/logo.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ══════════════════════ LOGIN VIEW ══════════════════════ -->
+<div id="authView" class="auth-screen">
+  <div class="auth-blob b1"></div>
+  <div class="auth-blob b2"></div>
+  <div class="auth-blob b3"></div>
+  <div class="auth-card">
+    <div class="auth-logo-wrap">
+      <img class="auth-logo" src="https://cdn.futeducation.com/uploads/assets/mis/logo.webp" alt="AditiVerse">
+    </div>
+    <p class="auth-sub">Your Photos. Your Storage. Your Universe.</p>
+
+    <div class="auth-err" id="authErr"><i class="bi bi-exclamation-circle"></i><span id="authErrMsg">Invalid credentials</span></div>
+
+    <form id="loginForm" class="auth-form" autocomplete="on" novalidate>
+      <div class="ig">
+        <label>Email</label>
+        <input type="email" class="inp" id="authEmail" name="email" placeholder="you@example.com" autocomplete="email" inputmode="email" required>
+      </div>
+      <div class="ig">
+        <label>Password</label>
+        <input type="password" class="inp" id="authPass" name="password" placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn-verse btn-full" id="authBtn">
+        <span id="authBtnLabel"><i class="bi bi-stars"></i> Enter AditiVerse</span>
+        <span class="spinner" id="authSpinner" style="display:none"></span>
+      </button>
+    </form>
+  </div>
+  <div class="auth-foot">Powered by your own CDN · R2 Storage · Cloudflare</div>
+</div>
+
+<!-- ══════════════════════ APP SHELL ══════════════════════ -->
+<div id="appView" class="app-shell" style="display:none">
+
+  <!-- ── Top bar ── -->
+  <header class="topbar" id="topbar">
+    <button class="icon-btn ghost" id="menuBtn" aria-label="Menu"><i class="bi bi-list"></i></button>
+    <div class="brand">
+      <img src="https://cdn.futeducation.com/uploads/assets/mis/logo.webp" alt="AditiVerse" class="brand-logo">
+    </div>
+    <button class="icon-btn ghost" id="topSearchBtn" aria-label="Search"><i class="bi bi-search"></i></button>
+  </header>
+
+  <!-- ── Selection bar (long-press multi-select) ── -->
+  <header class="topbar selbar" id="selbar" style="display:none">
+    <button class="icon-btn ghost" id="selCancelBtn" aria-label="Cancel"><i class="bi bi-x-lg"></i></button>
+    <span class="sel-count" id="selCountLabel">0 selected</span>
+    <button class="icon-btn ghost" id="selAllBtn" aria-label="Select all"><i class="bi bi-check2-all"></i></button>
+  </header>
+
+  <!-- ── Breadcrumb (Home / inside an album) ── -->
+  <div class="crumbwrap" id="crumbwrap"></div>
+
+  <!-- ── Views ── -->
+  <main class="views">
+
+    <!-- HOME -->
+    <section class="view active" id="view-home">
+      <div class="chiprow" id="filterChips">
+        <button class="chip active" data-filter="all">All</button>
+        <button class="chip" data-filter="image">Photos</button>
+        <button class="chip" data-filter="video">Videos</button>
+        <button class="chip" data-filter="file">Files</button>
+      </div>
+
+      <div class="state-block" id="homeLoading">
+        <div class="verse-spinner"></div>
+        <div class="state-title">Loading your universe…</div>
+        <div class="state-sub">Fetching photos from your CDN</div>
+      </div>
+      <div class="state-block" id="homeError" style="display:none">
+        <i class="bi bi-cloud-slash state-icon"></i>
+        <div class="state-title">Couldn't load your gallery</div>
+        <div class="state-sub" id="homeErrorMsg">Check your connection and try again.</div>
+        <button class="btn-verse-outline" id="homeRetryBtn">Retry</button>
+      </div>
+      <div class="state-block" id="homeEmpty" style="display:none">
+        <i class="bi bi-images state-icon"></i>
+        <div class="state-title">No photos here yet</div>
+        <div class="state-sub">Tap the + button to add your first memory.</div>
+      </div>
+
+      <div class="grid" id="homeGrid"></div>
+    </section>
+
+    <!-- SEARCH -->
+    <section class="view" id="view-search">
+      <div class="search-field">
+        <i class="bi bi-search"></i>
+        <input type="text" id="searchInput" placeholder="Search photos, videos, files…" autocomplete="off">
+        <button class="clear-x" id="searchClearBtn" style="display:none"><i class="bi bi-x-circle-fill"></i></button>
+      </div>
+
+      <div class="filter-panel">
+        <div class="fp-row">
+          <span class="fp-label">Type</span>
+          <div class="chiprow tight">
+            <button class="chip active" data-ftype="all">All</button>
+            <button class="chip" data-ftype="image">Photos</button>
+            <button class="chip" data-ftype="video">Videos</button>
+            <button class="chip" data-ftype="file">Files</button>
+          </div>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">Size</span>
+          <div class="chiprow tight">
+            <button class="chip active" data-fsize="all">Any</button>
+            <button class="chip" data-fsize="s">&lt; 1 MB</button>
+            <button class="chip" data-fsize="m">1–10 MB</button>
+            <button class="chip" data-fsize="l">&gt; 10 MB</button>
+          </div>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">Album</span>
+          <select class="modal-select" id="searchFolderSelect"><option value="__all">All albums</option></select>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">Sort by</span>
+          <select class="modal-select" id="sortSelect">
+            <option value="name-asc">Name A–Z</option>
+            <option value="name-desc">Name Z–A</option>
+            <option value="size-desc">Largest first</option>
+            <option value="size-asc">Smallest first</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="search-count" id="searchCount"></div>
+      <div class="grid" id="searchGrid"></div>
+    </section>
+
+    <!-- ALBUMS -->
+    <section class="view" id="view-albums">
+      <div class="albums-head">
+        <h2 class="view-title">Albums</h2>
+        <button class="btn-verse-outline sm" id="newAlbumBtn"><i class="bi bi-folder-plus"></i> New</button>
+      </div>
+      <div class="state-block" id="albumsEmpty" style="display:none">
+        <i class="bi bi-folder2-open state-icon"></i>
+        <div class="state-title">No albums yet</div>
+        <div class="state-sub">Create one to start organizing your photos.</div>
+      </div>
+      <div class="album-grid" id="albumGrid"></div>
+    </section>
+
+    <!-- FAVORITES -->
+    <section class="view" id="view-favorites">
+      <div class="state-block" id="favEmpty" style="display:none">
+        <i class="bi bi-heart state-icon"></i>
+        <div class="state-title">No favorites yet</div>
+        <div class="state-sub">Tap the heart on any photo to save it here.</div>
+      </div>
+      <div class="grid" id="favGrid"></div>
+    </section>
+
+    <!-- ME -->
+    <section class="view" id="view-me">
+      <div class="profile-card">
+        <div class="profile-avatar-ring">
+          <img src="https://cdn.futeducation.com/uploads/assets/mis/logo.webp" alt="" class="profile-avatar">
+        </div>
+        <div class="profile-email" id="profileEmail">—</div>
+        <div class="profile-tag">AditiVerse member</div>
+      </div>
+
+      <button class="me-row" id="meStorageBtn">
+        <i class="bi bi-pie-chart-fill me-ico"></i>
+        <div class="me-row-text">
+          <span class="me-row-title">Storage overview</span>
+          <span class="me-row-sub" id="meStorageSub">Calculating…</span>
+        </div>
+        <i class="bi bi-chevron-right"></i>
+      </button>
+
+      <div class="me-row static">
+        <i class="bi bi-cloud-check-fill me-ico"></i>
+        <div class="me-row-text">
+          <span class="me-row-title">Built for Performance</span>
+          <span class="me-row-sub">R2 Storage · Cloudflare CDN · WebP/AVIF ready</span>
+        </div>
+      </div>
+
+      <button class="me-row danger" id="signOutBtn">
+        <i class="bi bi-box-arrow-right me-ico"></i>
+        <div class="me-row-text"><span class="me-row-title">Sign out</span></div>
+      </button>
+    </section>
+
+  </main>
+
+  <!-- ── FAB ── -->
+  <button class="fab" id="uploadFab" aria-label="Upload"><i class="bi bi-plus-lg"></i></button>
+
+  <!-- ── Bottom nav ── -->
+  <nav class="bottomnav" id="bottomnav">
+    <button class="nav-btn active" data-view="home"><i class="bi bi-house-fill"></i><span>Home</span></button>
+    <button class="nav-btn" data-view="search"><i class="bi bi-search"></i><span>Search</span></button>
+    <button class="nav-btn" data-view="albums"><i class="bi bi-images"></i><span>Albums</span></button>
+    <button class="nav-btn" data-view="favorites"><i class="bi bi-heart-fill"></i><span>Favorites</span></button>
+    <button class="nav-btn" data-view="me"><i class="bi bi-person-fill"></i><span>Me</span></button>
+  </nav>
+
+  <!-- ── Selection action bar ── -->
+  <div class="seltoolbar" id="seltoolbar">
+    <button id="selShareBtn"><i class="bi bi-share-fill"></i><span>Share</span></button>
+    <button id="selDownloadBtn"><i class="bi bi-download"></i><span>Download</span></button>
+    <button id="selAlbumBtn"><i class="bi bi-folder-symlink"></i><span>Move</span></button>
+    <button id="selDeleteBtn" class="danger"><i class="bi bi-trash3"></i><span>Delete</span></button>
+  </div>
+
+  <!-- ══════════════════════ FULL-SCREEN VIEWER ══════════════════════ -->
+  <div class="viewer" id="viewer">
+    <div class="viewer-top">
+      <button class="icon-btn ghost light" id="viewerClose"><i class="bi bi-chevron-left"></i></button>
+      <button class="icon-btn ghost light" id="viewerFav"><i class="bi bi-heart"></i></button>
+      <button class="icon-btn ghost light" id="viewerMore"><i class="bi bi-three-dots-vertical"></i></button>
+    </div>
+    <div class="viewer-stage" id="viewerStage">
+      <img id="viewerImg" class="viewer-media" alt="">
+      <div id="viewerFileCard" class="viewer-filecard" style="display:none">
+        <i class="bi bi-file-earmark-richtext"></i>
+        <span id="viewerFileName"></span>
+      </div>
+    </div>
+    <div class="viewer-counter" id="viewerCounter">1 / 1</div>
+    <div class="viewer-bottom">
+      <button id="viewerShareBtn"><i class="bi bi-share-fill"></i><span>Share</span></button>
+      <button id="viewerDownloadBtn"><i class="bi bi-download"></i><span>Download</span></button>
+      <button id="viewerInfoBtn"><i class="bi bi-info-circle"></i><span>Info</span></button>
+      <button id="viewerDeleteBtn" class="danger"><i class="bi bi-trash3"></i><span>Delete</span></button>
+    </div>
+  </div>
+
+  <!-- ── Photo details bottom sheet ── -->
+  <div class="sheet-overlay" id="detailOverlay">
+    <div class="sheet" id="detailSheet">
+      <div class="sheet-handle"></div>
+      <button class="icon-btn ghost sheet-close" id="detailClose"><i class="bi bi-chevron-left"></i></button>
+      <div class="detail-thumb-wrap"><img id="detailThumb" class="detail-thumb" alt=""></div>
+      <div class="detail-name" id="detailName">—</div>
+      <div class="detail-row"><i class="bi bi-hdd"></i><span id="detailSize">—</span></div>
+      <div class="detail-row"><i class="bi bi-folder2"></i><span id="detailFolder">—</span></div>
+      <div class="detail-row"><i class="bi bi-tag"></i><span id="detailType">—</span></div>
+      <div class="detail-url-box">
+        <i class="bi bi-link-45deg"></i>
+        <span class="detail-url" id="detailUrl">—</span>
+        <button class="pill-btn" id="detailCopyBtn">Copy</button>
+      </div>
+      <div class="detail-actions">
+        <button id="detailDownloadBtn"><i class="bi bi-download"></i><span>Download Original</span><i class="bi bi-chevron-right"></i></button>
+        <button id="detailShareBtn"><i class="bi bi-share-fill"></i><span>Share</span><i class="bi bi-chevron-right"></i></button>
+        <button id="detailMoveBtn"><i class="bi bi-folder-symlink"></i><span>Move to Album</span><i class="bi bi-chevron-right"></i></button>
+        <button id="detailRenameBtn"><i class="bi bi-pencil"></i><span>Rename</span><i class="bi bi-chevron-right"></i></button>
+        <button id="detailDeleteBtn" class="danger"><i class="bi bi-trash3"></i><span>Delete</span><i class="bi bi-chevron-right"></i></button>
+      </div>
+      <button class="btn-verse-outline btn-full" id="detailCloseBtn">Close</button>
+    </div>
+  </div>
+
+  <!-- ── Storage overview bottom sheet ── -->
+  <div class="sheet-overlay" id="storageOverlay">
+    <div class="sheet" id="storageSheet">
+      <div class="sheet-handle"></div>
+      <h3 class="sheet-title">Storage</h3>
+      <div class="storage-ring-wrap">
+        <svg viewBox="0 0 120 120" class="storage-ring">
+          <circle cx="60" cy="60" r="52" class="ring-bg"/>
+          <circle cx="60" cy="60" r="52" class="ring-photos" id="ringPhotos"/>
+          <circle cx="60" cy="60" r="52" class="ring-videos" id="ringVideos"/>
+          <circle cx="60" cy="60" r="52" class="ring-others" id="ringOthers"/>
+        </svg>
+        <div class="storage-ring-label">
+          <span class="ring-big" id="storageBig">0 B</span>
+          <span class="ring-small">used</span>
+        </div>
+      </div>
+      <div class="storage-legend">
+        <div class="leg-row"><span class="dot photos"></span>Photos<span class="leg-val" id="legPhotos">0 B</span></div>
+        <div class="leg-row"><span class="dot videos"></span>Videos<span class="leg-val" id="legVideos">0 B</span></div>
+        <div class="leg-row"><span class="dot others"></span>Other files<span class="leg-val" id="legOthers">0 B</span></div>
+      </div>
+      <div class="storage-counts">
+        <div><span id="countFiles">0</span><small>Files</small></div>
+        <div><span id="countAlbums">0</span><small>Albums</small></div>
+      </div>
+      <button class="btn-verse-outline btn-full" id="storageCloseBtn">Close</button>
+    </div>
+  </div>
+
+  <!-- ── Upload sheet ── -->
+  <div class="sheet-overlay" id="uploadOverlay">
+    <div class="sheet" id="uploadSheet">
+      <div class="sheet-handle"></div>
+      <h3 class="sheet-title">Upload</h3>
+      <label class="dropzone" id="uploadDrop">
+        <i class="bi bi-cloud-arrow-up"></i>
+        <span class="dz-title">Tap to choose photos, videos or files</span>
+        <span class="dz-sub">or drag &amp; drop</span>
+        <input type="file" id="uploadInput" multiple hidden>
+      </label>
+      <div class="ig">
+        <label>Upload to</label>
+        <select class="modal-select" id="uploadDestSelect"><option value="">Home (root)</option></select>
+      </div>
+      <div class="upload-queue" id="uploadQueue"></div>
+      <button class="btn-verse-outline btn-full" id="uploadCloseBtn">Close</button>
+    </div>
+  </div>
+
+  <!-- ── Rename / New album / prompt modal ── -->
+  <div class="modal-overlay" id="promptModal">
+    <div class="modal-box">
+      <div class="modal-title" id="promptTitle">Rename</div>
+      <div class="modal-sub" id="promptSub"></div>
+      <input class="modal-input" id="promptInput" type="text" autocomplete="off" spellcheck="false">
+      <div class="modal-actions">
+        <button class="modal-cancel" id="promptCancelBtn">Cancel</button>
+        <button class="modal-confirm" id="promptConfirmBtn"><span class="modal-btn-text" id="promptConfirmLabel">Save</span><span class="modal-spinner"></span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Move / album picker modal ── -->
+  <div class="modal-overlay" id="pickerModal">
+    <div class="modal-box">
+      <div class="modal-title">Move to album</div>
+      <div class="modal-sub">Choose a destination.</div>
+      <div class="folder-picker" id="folderPicker"></div>
+      <div class="modal-actions">
+        <button class="modal-cancel" id="pickerCancelBtn">Cancel</button>
+        <button class="modal-confirm" id="pickerConfirmBtn"><span class="modal-btn-text">Move here</span><span class="modal-spinner"></span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Delete confirm modal ── -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal-box">
+      <div class="modal-title" id="deleteTitle">Delete?</div>
+      <div class="modal-sub" id="deleteSub">This can't be undone.</div>
+      <div class="modal-actions">
+        <button class="modal-cancel" id="deleteCancelBtn">Cancel</button>
+        <button class="modal-confirm danger" id="deleteConfirmBtn"><span class="modal-btn-text">Delete</span><span class="modal-spinner"></span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Share sheet ── -->
+  <div class="sheet-overlay" id="shareOverlay">
+    <div class="sheet" id="shareSheet">
+      <div class="sheet-handle"></div>
+      <h3 class="sheet-title">Share</h3>
+      <p class="share-hint">Anyone with this link can view/download directly from your CDN.</p>
+      <div class="share-links" id="shareLinks"></div>
+      <button class="btn-verse btn-full" id="shareCopyAllBtn"><i class="bi bi-copy"></i> Copy link<span id="shareCopyPlural"></span></button>
+      <button class="btn-verse-outline btn-full" id="shareNativeBtn"><i class="bi bi-share-fill"></i> Use device share sheet</button>
+      <button class="btn-verse-outline btn-full" id="shareCloseBtn">Close</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
